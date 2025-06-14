@@ -22,6 +22,7 @@ import com.bx.implatform.session.SessionContext;
 import com.bx.implatform.session.UserSession;
 import com.bx.implatform.util.BeanUtils;
 import com.bx.implatform.util.SensitiveFilterUtil;
+import com.bx.implatform.util.SnowflakeIdWorker;
 import com.bx.implatform.vo.PrivateMessageVO;
 import com.bx.implatform.vo.QuoteMessageVO;
 import com.bx.implatform.mongo.service.MongoMessageService;
@@ -47,6 +48,7 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
     private final SensitiveFilterUtil sensitiveFilterUtil;
     private final MongoMessageService mongoMessageService;
     private static final ScheduledThreadPoolExecutor EXECUTOR = ThreadPoolExecutorFactory.getThreadPoolExecutor();
+    private static final SnowflakeIdWorker ID_WORKER = new SnowflakeIdWorker(0, 0);
 
     @Override
     public PrivateMessageVO sendMessage(PrivateMessageDTO dto) {
@@ -67,6 +69,7 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
             msg.setContent(sensitiveFilterUtil.filter(dto.getContent()));
         }
         // this.save(msg);
+        msg.setId(ID_WORKER.nextId());
         mongoMessageService.savePrivateMessage(msg);
         // 推送消息
         PrivateMessageVO msgInfo = BeanUtils.copyProperties(msg, PrivateMessageVO.class);
@@ -113,6 +116,7 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
         recallMsg.setType(MessageType.RECALL.code());
         recallMsg.setContent(id.toString());
         // this.save(recallMsg);
+        recallMsg.setId(ID_WORKER.nextId());
         mongoMessageService.savePrivateMessage(recallMsg);
         // 推送消息
         PrivateMessageVO msgInfo = BeanUtils.copyProperties(recallMsg, PrivateMessageVO.class);

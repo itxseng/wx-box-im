@@ -2,14 +2,14 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/im_platform?useSSL=false&useUnicode=true&characterEncoding=utf-8&allowPublicKeyRetrieval=true
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    username: root
+    password: root
   data:
     redis:
-      host: ${REDIS_HOST}
+      host: 127.0.0.1
       port: 6379
     mongodb:
-      uri: ${MONGO_URI:mongodb://localhost:27017/boxim}
+      uri: mongodb://localhost:27017/boxim
 
 minio:
   endpoint: http://127.0.0.1:9000 #内网地址

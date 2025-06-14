@@ -55,26 +55,32 @@ public class MongoMessageService {
 
     public List<PrivateMessage> findPrivateMessages(Long userId, Long minId, Date minDate) {
         Query query = new Query();
-        Criteria c = new Criteria().gt("id", minId).gte("sendTime", minDate)
-            .orOperator(Criteria.where("sendId").is(userId), Criteria.where("recvId").is(userId));
+        Criteria c = Criteria.where("id").gt(minId)
+                .and("sendTime").gte(minDate)
+                .andOperator(
+                        new Criteria().orOperator(
+                                Criteria.where("sendId").is(userId),
+                                Criteria.where("recvId").is(userId)
+                        )
+                );
         query.addCriteria(c);
         query.with(Sort.by(Sort.Direction.ASC, "id"));
         return mongoTemplate.find(query, PrivateMessageDoc.class).stream()
-            .map(PrivateMessageDoc::toEntity).collect(Collectors.toList());
+                .map(PrivateMessageDoc::toEntity).collect(Collectors.toList());
     }
 
     public List<PrivateMessage> findPrivateHistory(Long userId, Long friendId, long skip, long limit) {
         Query query = new Query();
         Criteria c = new Criteria().orOperator(
-            new Criteria().andOperator(Criteria.where("sendId").is(userId), Criteria.where("recvId").is(friendId)),
-            new Criteria().andOperator(Criteria.where("sendId").is(friendId), Criteria.where("recvId").is(userId))
+                new Criteria().andOperator(Criteria.where("sendId").is(userId), Criteria.where("recvId").is(friendId)),
+                new Criteria().andOperator(Criteria.where("sendId").is(friendId), Criteria.where("recvId").is(userId))
         );
         query.addCriteria(c);
         query.addCriteria(Criteria.where("status").ne(2));
         query.with(Sort.by(Sort.Direction.DESC, "id"));
         query.skip(skip).limit((int) limit);
         return mongoTemplate.find(query, PrivateMessageDoc.class).stream()
-            .map(PrivateMessageDoc::toEntity).collect(Collectors.toList());
+                .map(PrivateMessageDoc::toEntity).collect(Collectors.toList());
     }
 
     public void markPrivateMessagesRead(Long friendId, Long myId, Integer sended, Integer readed) {
@@ -96,7 +102,7 @@ public class MongoMessageService {
     public List<PrivateMessage> findPrivateMessagesByIds(Collection<Long> ids) {
         Query query = new Query(Criteria.where("id").in(ids));
         return mongoTemplate.find(query, PrivateMessageDoc.class).stream()
-            .map(PrivateMessageDoc::toEntity).collect(Collectors.toList());
+                .map(PrivateMessageDoc::toEntity).collect(Collectors.toList());
     }
 
     public Optional<GroupMessage> findGroupMessageById(Long id) {
@@ -106,40 +112,40 @@ public class MongoMessageService {
     public List<GroupMessage> findGroupMessages(Long minId, Date minDate, Collection<Long> groupIds, Integer recall) {
         Query query = new Query();
         query.addCriteria(Criteria.where("id").gt(minId)
-            .gte("sendTime", minDate)
-            .in("groupId", groupIds)
-            .ne("status", recall));
+                .and("sendTime").gte(minDate)
+                .and("groupId").in(groupIds)
+                .and("status").ne(recall));
         query.with(Sort.by(Sort.Direction.ASC, "id"));
         return mongoTemplate.find(query, GroupMessageDoc.class).stream()
-            .map(GroupMessageDoc::toEntity).collect(Collectors.toList());
+                .map(GroupMessageDoc::toEntity).collect(Collectors.toList());
     }
 
     public List<GroupMessage> findQuitGroupMessages(Long groupId, Date minDate, Date quitTime, Long minId) {
         Query query = new Query();
         query.addCriteria(Criteria.where("id").gt(minId)
-            .gte("sendTime", minDate)
-            .lte("sendTime", quitTime)
-            .is("groupId", groupId));
+                .and("sendTime").gte(minDate)
+                .and("sendTime").lte(quitTime)
+                .and("groupId").is(groupId));
         query.with(Sort.by(Sort.Direction.ASC, "id"));
         return mongoTemplate.find(query, GroupMessageDoc.class).stream()
-            .map(GroupMessageDoc::toEntity).collect(Collectors.toList());
+                .map(GroupMessageDoc::toEntity).collect(Collectors.toList());
     }
 
     public List<GroupMessage> findGroupMessagesByIds(Collection<Long> ids) {
         Query query = new Query(Criteria.where("id").in(ids));
         return mongoTemplate.find(query, GroupMessageDoc.class).stream()
-            .map(GroupMessageDoc::toEntity).collect(Collectors.toList());
+                .map(GroupMessageDoc::toEntity).collect(Collectors.toList());
     }
 
     public List<GroupMessage> findGroupHistory(Long groupId, Date joinTime, long skip, long limit, Integer recall) {
         Query query = new Query();
         query.addCriteria(Criteria.where("groupId").is(groupId)
-            .gt("sendTime", joinTime)
-            .ne("status", recall));
+                .and("sendTime").gt(joinTime)
+                .and("status").ne(recall));
         query.with(Sort.by(Sort.Direction.DESC, "id"));
         query.skip(skip).limit((int) limit);
         return mongoTemplate.find(query, GroupMessageDoc.class).stream()
-            .map(GroupMessageDoc::toEntity).collect(Collectors.toList());
+                .map(GroupMessageDoc::toEntity).collect(Collectors.toList());
     }
 
     public GroupMessage findLastGroupMessage(Long groupId) {
@@ -152,13 +158,17 @@ public class MongoMessageService {
 
     public List<GroupMessage> findReceiptMessages(Long groupId, Long startId, Long endId, Integer recall) {
         Query query = new Query();
-        query.addCriteria(Criteria.where("groupId").is(groupId)
-            .gt("id", startId)
-            .le("id", endId)
-            .ne("status", recall)
-            .is("receipt", true));
+
+        Criteria idCriteria = Criteria.where("id").gt(startId).lte(endId);
+        Criteria otherCriteria = new Criteria().andOperator(
+                Criteria.where("groupId").is(groupId),
+                Criteria.where("status").ne(recall),
+                Criteria.where("receipt").is(true)
+        );
+
+        query.addCriteria(new Criteria().andOperator(idCriteria, otherCriteria));
         return mongoTemplate.find(query, GroupMessageDoc.class).stream()
-            .map(GroupMessageDoc::toEntity).collect(Collectors.toList());
+                .map(GroupMessageDoc::toEntity).collect(Collectors.toList());
     }
 
     public void updateGroupMessageReceiptOk(Long id, boolean ok) {

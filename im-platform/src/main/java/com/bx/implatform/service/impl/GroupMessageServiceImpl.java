@@ -30,6 +30,7 @@ import com.bx.implatform.session.SessionContext;
 import com.bx.implatform.session.UserSession;
 import com.bx.implatform.util.BeanUtils;
 import com.bx.implatform.util.SensitiveFilterUtil;
+import com.bx.implatform.util.SnowflakeIdWorker;
 import com.bx.implatform.vo.GroupMessageVO;
 import com.bx.implatform.vo.QuoteMessageVO;
 import com.bx.implatform.mongo.service.MongoMessageService;
@@ -57,6 +58,7 @@ public class GroupMessageServiceImpl extends ServiceImpl<GroupMessageMapper, Gro
     private final SensitiveFilterUtil sensitiveFilterUtil;
     private final MongoMessageService mongoMessageService;
     private static final ScheduledThreadPoolExecutor EXECUTOR = ThreadPoolExecutorFactory.getThreadPoolExecutor();
+    private static final SnowflakeIdWorker  ID_WORKER = new SnowflakeIdWorker(0, 0);
 
     @Override
     public GroupMessageVO sendMessage(GroupMessageDTO dto) {
@@ -93,6 +95,7 @@ public class GroupMessageServiceImpl extends ServiceImpl<GroupMessageMapper, Gro
             msg.setContent(sensitiveFilterUtil.filter(dto.getContent()));
         }
         // this.save(msg);
+        msg.setId(ID_WORKER.nextId());
         mongoMessageService.saveGroupMessage(msg);
 
         // 群发
@@ -145,6 +148,7 @@ public class GroupMessageServiceImpl extends ServiceImpl<GroupMessageMapper, Gro
         recallMsg.setContent(id.toString());
         recallMsg.setSendTime(new Date());
         // this.save(recallMsg);
+        recallMsg.setId(ID_WORKER.nextId());
         mongoMessageService.saveGroupMessage(recallMsg);
         // 群发
         List<Long> userIds = groupMemberService.findUserIdsByGroupId(msg.getGroupId());
