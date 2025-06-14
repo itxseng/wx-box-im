@@ -6,13 +6,13 @@ import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import okhttp3.*
+import android.content.Intent
 import android.content.SharedPreferences
 import org.json.JSONObject
 import java.io.IOException
 
 class LoginActivity : AppCompatActivity() {
     private val client = OkHttpClient()
-    private var wsManager: WebSocketManager? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,11 +60,10 @@ class LoginActivity : AppCompatActivity() {
                         putString("refreshToken", refreshToken)
                         apply()
                     }
-                    wsManager = WebSocketManager(client).also {
-                        it.connect("wss://www.boxim.online/im", accessToken)
-                    }
+                    WebSocketManager.connect("wss://www.boxim.online/im", accessToken)
                     runOnUiThread {
                         Toast.makeText(this@LoginActivity, "登录成功", Toast.LENGTH_SHORT).show()
+                        startActivity(Intent(this@LoginActivity, MainActivity::class.java))
                     }
                 } else {
                     runOnUiThread {
@@ -77,6 +76,5 @@ class LoginActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        wsManager?.close()
     }
 }

@@ -4,7 +4,8 @@ import android.os.Handler
 import android.os.Looper
 import okhttp3.*
 
-class WebSocketManager(private val client: OkHttpClient) {
+object WebSocketManager {
+    private val client = OkHttpClient()
     private var webSocket: WebSocket? = null
     private val heartBeatInterval = 20_000L
     private val handler = Handler(Looper.getMainLooper())
