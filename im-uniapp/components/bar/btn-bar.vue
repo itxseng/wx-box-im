@@ -1,0 +1,75 @@
+<template>
+	<view class="btn-bar" :class="type">
+		<text v-if="icon" class="icon iconfont" :class="icon"></text>
+		<text class="title">{{ title }}</text>
+	</view>
+</template>
+
+<script>
+export default {
+	name: "btn-bar",
+	props: {
+		title: {
+			type: String,
+			required: true
+		},
+		icon: {
+			type: String,
+			required: false
+		},
+		type: {
+			type: String,
+			default: "normal"
+		},
+		color: {
+			type: String,
+			default: "#000"
+		}
+	},
+	computed: {
+		style() {
+			let color = "#000";
+			switch (this.type) {
+				case 'danger':
+					color = "#f14747";
+					break;
+				case 'primary':
+					color = "#35567f";
+					break;
+			}
+			return `color: ${color};`
+		}
+	}
+}
+</script>
+
+<style lang="scss" scoped>
+.btn-bar {
+	height: 100rpx;
+	margin-top: 3rpx;
+	background-color: white;
+	line-height: 100rpx;
+	text-align: center;
+	display: flex;
+	justify-content: center;
+	color: $im-text-color;
+
+	.icon {
+		font-size: 40rpx;
+		font-weight: 600;
+		margin-right: 10rpx;
+	}
+
+	.title {
+		font-size: $im-font-size-large;
+		font-weight: 600;
+	}
+
+  &.primary {
+    color: $im-color-primary
+  }
+  &.danger {
+    color: $im-color-danger;
+  }
+}
+</style>
