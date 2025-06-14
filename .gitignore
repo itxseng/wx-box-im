@@ -1,4 +1,5 @@
 /.idea/
+**/.idea
 /box-im.iml
 /im-server/im-server.iml
 /im-platform/im-platform.iml
@@ -9,3 +10,5 @@
 /im-uniapp/package-lock.json
 .env
 **/target/
+
+**/node_modules/
