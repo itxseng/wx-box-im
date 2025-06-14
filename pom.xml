@@ -19,6 +19,7 @@
         <module>im-server</module>
         <module>im-common</module>
         <module>im-client</module>
+        <module>im-rocketmq</module>
     </modules>
 
     <properties>
