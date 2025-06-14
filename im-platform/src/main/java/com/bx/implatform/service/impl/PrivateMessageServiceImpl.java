@@ -28,6 +28,7 @@ import com.bx.implatform.util.BeanUtils;
 import com.bx.implatform.util.SensitiveFilterUtil;
 import com.bx.implatform.vo.PrivateMessageVO;
 import com.bx.implatform.vo.QuoteMessageVO;
+import com.bx.implatform.mongo.service.MongoMessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.time.DateUtils;
@@ -48,6 +49,7 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
     private final UserBlacklistService userBlacklistService;
     private final IMClient imClient;
     private final SensitiveFilterUtil sensitiveFilterUtil;
+    private final MongoMessageService mongoMessageService;
     private static final ScheduledThreadPoolExecutor EXECUTOR = ThreadPoolExecutorFactory.getThreadPoolExecutor();
 
     @Override
@@ -69,6 +71,7 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
             msg.setContent(sensitiveFilterUtil.filter(dto.getContent()));
         }
         this.save(msg);
+        mongoMessageService.savePrivateMessage(msg);
         // 推送消息
         PrivateMessageVO msgInfo = BeanUtils.copyProperties(msg, PrivateMessageVO.class);
         // 填充引用消息
@@ -104,6 +107,7 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
         // 修改消息状态
         msg.setStatus(MessageStatus.RECALL.code());
         this.updateById(msg);
+        mongoMessageService.updatePrivateMessageStatus(id, MessageStatus.RECALL.code());
         // 生成一条撤回消息
         PrivateMessage recallMsg = new PrivateMessage();
         recallMsg.setSendId(session.getUserId());
@@ -113,6 +117,7 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
         recallMsg.setType(MessageType.RECALL.code());
         recallMsg.setContent(id.toString());
         this.save(recallMsg);
+        mongoMessageService.savePrivateMessage(recallMsg);
         // 推送消息
         PrivateMessageVO msgInfo = BeanUtils.copyProperties(recallMsg, PrivateMessageVO.class);
         IMPrivateMessage<PrivateMessageVO> sendMessage = new IMPrivateMessage<>();

@@ -35,6 +35,7 @@ import com.bx.implatform.util.BeanUtils;
 import com.bx.implatform.util.SensitiveFilterUtil;
 import com.bx.implatform.vo.GroupMessageVO;
 import com.bx.implatform.vo.QuoteMessageVO;
+import com.bx.implatform.mongo.service.MongoMessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.time.DateUtils;
@@ -57,6 +58,7 @@ public class GroupMessageServiceImpl extends ServiceImpl<GroupMessageMapper, Gro
     private final RedisTemplate<String, Object> redisTemplate;
     private final IMClient imClient;
     private final SensitiveFilterUtil sensitiveFilterUtil;
+    private final MongoMessageService mongoMessageService;
     private static final ScheduledThreadPoolExecutor EXECUTOR = ThreadPoolExecutorFactory.getThreadPoolExecutor();
 
     @Override
@@ -94,6 +96,7 @@ public class GroupMessageServiceImpl extends ServiceImpl<GroupMessageMapper, Gro
             msg.setContent(sensitiveFilterUtil.filter(dto.getContent()));
         }
         this.save(msg);
+        mongoMessageService.saveGroupMessage(msg);
 
         // 群发
         GroupMessageVO msgInfo = BeanUtils.copyProperties(msg, GroupMessageVO.class);
@@ -134,6 +137,7 @@ public class GroupMessageServiceImpl extends ServiceImpl<GroupMessageMapper, Gro
         // 修改数据库
         msg.setStatus(MessageStatus.RECALL.code());
         this.updateById(msg);
+        mongoMessageService.updateGroupMessageStatus(id, MessageStatus.RECALL.code());
         // 生成一条撤回消息
         GroupMessage recallMsg = new GroupMessage();
         recallMsg.setStatus(MessageStatus.UNSEND.code());
@@ -144,6 +148,7 @@ public class GroupMessageServiceImpl extends ServiceImpl<GroupMessageMapper, Gro
         recallMsg.setContent(id.toString());
         recallMsg.setSendTime(new Date());
         this.save(recallMsg);
+        mongoMessageService.saveGroupMessage(recallMsg);
         // 群发
         List<Long> userIds = groupMemberService.findUserIdsByGroupId(msg.getGroupId());
         GroupMessageVO msgInfo = BeanUtils.copyProperties(recallMsg, GroupMessageVO.class);

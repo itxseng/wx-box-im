@@ -5,6 +5,9 @@ spring:
     active: dev # 环境 dev|test|prod
   application:
     name: im-platform
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://localhost:27017/boxim}
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
