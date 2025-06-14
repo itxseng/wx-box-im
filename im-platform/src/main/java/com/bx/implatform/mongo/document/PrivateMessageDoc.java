@@ -32,4 +32,17 @@ public class PrivateMessageDoc {
         doc.setSendTime(message.getSendTime());
         return doc;
     }
+
+    public PrivateMessage toEntity() {
+        PrivateMessage msg = new PrivateMessage();
+        msg.setId(this.id);
+        msg.setSendId(this.sendId);
+        msg.setRecvId(this.recvId);
+        msg.setContent(this.content);
+        msg.setType(this.type);
+        msg.setQuoteMessageId(this.quoteMessageId);
+        msg.setStatus(this.status);
+        msg.setSendTime(this.sendTime);
+        return msg;
+    }
 }

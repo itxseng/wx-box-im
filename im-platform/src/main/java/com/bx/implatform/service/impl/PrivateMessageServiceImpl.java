@@ -1,10 +1,6 @@
 package com.bx.implatform.service.impl;
 
 import cn.hutool.core.collection.CollectionUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.bx.imclient.IMClient;
 import com.bx.imcommon.contant.IMConstant;
@@ -70,14 +66,14 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
         if (MessageType.TEXT.code().equals(dto.getType())) {
             msg.setContent(sensitiveFilterUtil.filter(dto.getContent()));
         }
-        this.save(msg);
+        // this.save(msg);
         mongoMessageService.savePrivateMessage(msg);
         // 推送消息
         PrivateMessageVO msgInfo = BeanUtils.copyProperties(msg, PrivateMessageVO.class);
         // 填充引用消息
         if (!Objects.isNull(dto.getQuoteMessageId())) {
-            PrivateMessage quoteMessage = this.getById(dto.getQuoteMessageId());
-            msgInfo.setQuoteMessage(BeanUtils.copyProperties(quoteMessage, QuoteMessageVO.class));
+            mongoMessageService.findPrivateMessageById(dto.getQuoteMessageId())
+                .ifPresent(q -> msgInfo.setQuoteMessage(BeanUtils.copyProperties(q, QuoteMessageVO.class)));
         }
         IMPrivateMessage<PrivateMessageVO> sendMessage = new IMPrivateMessage<>();
         sendMessage.setSender(new IMUserInfo(session.getUserId(), session.getTerminal()));
@@ -94,7 +90,7 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
     @Override
     public PrivateMessageVO recallMessage(Long id) {
         UserSession session = SessionContext.getSession();
-        PrivateMessage msg = this.getById(id);
+        PrivateMessage msg = mongoMessageService.findPrivateMessageById(id).orElse(null);
         if (Objects.isNull(msg)) {
             throw new GlobalException("消息不存在");
         }
@@ -106,7 +102,7 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
         }
         // 修改消息状态
         msg.setStatus(MessageStatus.RECALL.code());
-        this.updateById(msg);
+        // this.updateById(msg);
         mongoMessageService.updatePrivateMessageStatus(id, MessageStatus.RECALL.code());
         // 生成一条撤回消息
         PrivateMessage recallMsg = new PrivateMessage();
@@ -116,7 +112,7 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
         recallMsg.setRecvId(msg.getRecvId());
         recallMsg.setType(MessageType.RECALL.code());
         recallMsg.setContent(id.toString());
-        this.save(recallMsg);
+        // this.save(recallMsg);
         mongoMessageService.savePrivateMessage(recallMsg);
         // 推送消息
         PrivateMessageVO msgInfo = BeanUtils.copyProperties(recallMsg, PrivateMessageVO.class);
@@ -135,13 +131,8 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
         size = size > 0 ? size : 10;
         Long userId = SessionContext.getSession().getUserId();
         long stIdx = (page - 1) * size;
-        QueryWrapper<PrivateMessage> wrapper = new QueryWrapper<>();
-        wrapper.lambda().and(
-                wrap -> wrap.and(wp -> wp.eq(PrivateMessage::getSendId, userId).eq(PrivateMessage::getRecvId, friendId))
-                    .or(wp -> wp.eq(PrivateMessage::getRecvId, userId).eq(PrivateMessage::getSendId, friendId)))
-            .ne(PrivateMessage::getStatus, MessageStatus.RECALL.code()).orderByDesc(PrivateMessage::getId)
-            .last("limit " + stIdx + "," + size);
-        List<PrivateMessage> messages = this.list(wrapper);
+        List<PrivateMessage> messages = mongoMessageService.findPrivateHistory(
+            userId, friendId, stIdx, size);
         List<PrivateMessageVO> messageInfos =
             messages.stream().map(m -> BeanUtils.copyProperties(m, PrivateMessageVO.class))
                 .collect(Collectors.toList());
@@ -154,16 +145,9 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
     public void pullOfflineMessage(Long minId) {
         UserSession session = SessionContext.getSession();
         // 获取当前用户的消息
-        LambdaQueryWrapper<PrivateMessage> wrapper = Wrappers.lambdaQuery();
-        // 只能拉取最近3个月的消息,移动端只拉取一个月消息
         int months = session.getTerminal().equals(IMTerminalType.APP.code()) ? 1 : 3;
         Date minDate = DateUtils.addMonths(new Date(), -months);
-        wrapper.gt(PrivateMessage::getId, minId);
-        wrapper.ge(PrivateMessage::getSendTime, minDate);
-        wrapper.and(wp -> wp.eq(PrivateMessage::getSendId, session.getUserId()).or()
-            .eq(PrivateMessage::getRecvId, session.getUserId()));
-        wrapper.orderByAsc(PrivateMessage::getId);
-        List<PrivateMessage> messages = this.list(wrapper);
+        List<PrivateMessage> messages = mongoMessageService.findPrivateMessages(session.getUserId(), minId, minDate);
         // 提取所有引用消息
         Map<Long, QuoteMessageVO> quoteMessageMap = batchLoadQuoteMessage(messages);
         // 异步推送消息
@@ -216,26 +200,15 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
         sendMessage.setData(msgInfo);
         imClient.sendPrivateMessage(sendMessage);
         // 修改消息状态为已读
-        LambdaUpdateWrapper<PrivateMessage> updateWrapper = Wrappers.lambdaUpdate();
-        updateWrapper.eq(PrivateMessage::getSendId, friendId).eq(PrivateMessage::getRecvId, session.getUserId())
-            .eq(PrivateMessage::getStatus, MessageStatus.SENDED.code())
-            .set(PrivateMessage::getStatus, MessageStatus.READED.code());
-        this.update(updateWrapper);
+        mongoMessageService.markPrivateMessagesRead(friendId, session.getUserId(),
+            MessageStatus.SENDED.code(), MessageStatus.READED.code());
         log.info("消息已读，接收方id:{},发送方id:{}", session.getUserId(), friendId);
     }
 
     @Override
     public Long getMaxReadedId(Long friendId) {
         UserSession session = SessionContext.getSession();
-        LambdaQueryWrapper<PrivateMessage> wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(PrivateMessage::getSendId, session.getUserId()).eq(PrivateMessage::getRecvId, friendId)
-            .eq(PrivateMessage::getStatus, MessageStatus.READED.code()).orderByDesc(PrivateMessage::getId)
-            .select(PrivateMessage::getId).last("limit 1");
-        PrivateMessage message = this.getOne(wrapper);
-        if (Objects.isNull(message)) {
-            return -1L;
-        }
-        return message.getId();
+        return mongoMessageService.getMaxReadedId(session.getUserId(), friendId, MessageStatus.READED.code());
     }
 
     private void sendLoadingMessage(Boolean isLoading, UserSession session) {
@@ -260,9 +233,7 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
         if (CollectionUtil.isEmpty(ids)) {
             return new HashMap<>();
         }
-        LambdaQueryWrapper<PrivateMessage> wrapper = Wrappers.lambdaQuery();
-        wrapper.in(PrivateMessage::getId, ids);
-        List<PrivateMessage> quoteMessages = this.list(wrapper);
+        List<PrivateMessage> quoteMessages = mongoMessageService.findPrivateMessagesByIds(ids);
         // 转为vo
         return quoteMessages.stream()
             .collect(Collectors.toMap(m -> m.getId(), m -> BeanUtils.copyProperties(m, QuoteMessageVO.class)));

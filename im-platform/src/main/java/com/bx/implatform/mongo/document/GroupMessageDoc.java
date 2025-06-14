@@ -42,4 +42,22 @@ public class GroupMessageDoc {
         doc.setSendTime(message.getSendTime());
         return doc;
     }
+
+    public GroupMessage toEntity() {
+        GroupMessage msg = new GroupMessage();
+        msg.setId(this.id);
+        msg.setGroupId(this.groupId);
+        msg.setSendId(this.sendId);
+        msg.setSendNickName(this.sendNickName);
+        msg.setRecvIds(this.recvIds);
+        msg.setAtUserIds(this.atUserIds);
+        msg.setContent(this.content);
+        msg.setType(this.type);
+        msg.setQuoteMessageId(this.quoteMessageId);
+        msg.setReceipt(this.receipt);
+        msg.setReceiptOk(this.receiptOk);
+        msg.setStatus(this.status);
+        msg.setSendTime(this.sendTime);
+        return msg;
+    }
 }

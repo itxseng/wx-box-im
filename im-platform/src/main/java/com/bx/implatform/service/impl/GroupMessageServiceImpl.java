@@ -4,9 +4,6 @@ import cn.hutool.core.collection.CollStreamUtil;
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.StrUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.bx.imclient.IMClient;
 import com.bx.imcommon.contant.IMConstant;
@@ -95,15 +92,15 @@ public class GroupMessageServiceImpl extends ServiceImpl<GroupMessageMapper, Gro
         if (MessageType.TEXT.code().equals(dto.getType())) {
             msg.setContent(sensitiveFilterUtil.filter(dto.getContent()));
         }
-        this.save(msg);
+        // this.save(msg);
         mongoMessageService.saveGroupMessage(msg);
 
         // 群发
         GroupMessageVO msgInfo = BeanUtils.copyProperties(msg, GroupMessageVO.class);
         // 填充引用消息
         if (!Objects.isNull(dto.getQuoteMessageId())) {
-            GroupMessage quoteMessage = this.getById(dto.getQuoteMessageId());
-            msgInfo.setQuoteMessage(BeanUtils.copyProperties(quoteMessage, QuoteMessageVO.class));
+            mongoMessageService.findGroupMessageById(dto.getQuoteMessageId())
+                .ifPresent(q -> msgInfo.setQuoteMessage(BeanUtils.copyProperties(q, QuoteMessageVO.class)));
         }
         msgInfo.setAtUserIds(dto.getAtUserIds());
         IMGroupMessage<GroupMessageVO> sendMessage = new IMGroupMessage<>();
@@ -119,7 +116,7 @@ public class GroupMessageServiceImpl extends ServiceImpl<GroupMessageMapper, Gro
     @Override
     public GroupMessageVO recallMessage(Long id) {
         UserSession session = SessionContext.getSession();
-        GroupMessage msg = this.getById(id);
+        GroupMessage msg = mongoMessageService.findGroupMessageById(id).orElse(null);
         if (Objects.isNull(msg)) {
             throw new GlobalException("消息不存在");
         }
@@ -136,7 +133,7 @@ public class GroupMessageServiceImpl extends ServiceImpl<GroupMessageMapper, Gro
         }
         // 修改数据库
         msg.setStatus(MessageStatus.RECALL.code());
-        this.updateById(msg);
+        // this.updateById(msg);
         mongoMessageService.updateGroupMessageStatus(id, MessageStatus.RECALL.code());
         // 生成一条撤回消息
         GroupMessage recallMsg = new GroupMessage();
@@ -147,7 +144,7 @@ public class GroupMessageServiceImpl extends ServiceImpl<GroupMessageMapper, Gro
         recallMsg.setSendNickName(member.getShowNickName());
         recallMsg.setContent(id.toString());
         recallMsg.setSendTime(new Date());
-        this.save(recallMsg);
+        // this.save(recallMsg);
         mongoMessageService.saveGroupMessage(recallMsg);
         // 群发
         List<Long> userIds = groupMemberService.findUserIdsByGroupId(msg.getGroupId());
@@ -177,21 +174,15 @@ public class GroupMessageServiceImpl extends ServiceImpl<GroupMessageMapper, Gro
         // 只能拉取最近3个月的,移动端只拉一个月
         int months = session.getTerminal().equals(IMTerminalType.APP.code()) ? 1 : 3;
         Date minDate = DateUtils.addMonths(new Date(), -months);
-        LambdaQueryWrapper<GroupMessage> wrapper = Wrappers.lambdaQuery();
-        wrapper.gt(GroupMessage::getId, minId).gt(GroupMessage::getSendTime, minDate)
-            .in(GroupMessage::getGroupId, groupIds).ne(GroupMessage::getStatus, MessageStatus.RECALL.code())
-            .orderByAsc(GroupMessage::getId);
-        List<GroupMessage> messages = this.list(wrapper);
+        List<GroupMessage> messages = mongoMessageService.findGroupMessages(minId, minDate, groupIds, MessageStatus.RECALL.code());
         // 通过群聊对消息进行分组
         Map<Long, List<GroupMessage>> messageGroupMap =
             messages.stream().collect(Collectors.groupingBy(GroupMessage::getGroupId));
         // 退群前的消息
         List<GroupMember> quitMembers = groupMemberService.findQuitInMonth(session.getUserId());
         for (GroupMember quitMember : quitMembers) {
-            wrapper = Wrappers.lambdaQuery();
-            wrapper.gt(GroupMessage::getId, minId).between(GroupMessage::getSendTime, minDate, quitMember.getQuitTime())
-                .eq(GroupMessage::getGroupId, quitMember.getGroupId()).orderByAsc(GroupMessage::getId);
-            List<GroupMessage> groupMessages = this.list(wrapper);
+            List<GroupMessage> groupMessages = mongoMessageService.findQuitGroupMessages(
+                quitMember.getGroupId(), minDate, quitMember.getQuitTime(), minId);
             messageGroupMap.put(quitMember.getGroupId(), groupMessages);
             groupMemberMap.put(quitMember.getGroupId(), quitMember);
         }
@@ -266,10 +257,7 @@ public class GroupMessageServiceImpl extends ServiceImpl<GroupMessageMapper, Gro
     public void readedMessage(Long groupId) {
         UserSession session = SessionContext.getSession();
         // 取出最后的消息id
-        LambdaQueryWrapper<GroupMessage> wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(GroupMessage::getGroupId, groupId).orderByDesc(GroupMessage::getId).last("limit 1")
-            .select(GroupMessage::getId);
-        GroupMessage message = this.getOne(wrapper);
+        GroupMessage message = mongoMessageService.findLastGroupMessage(groupId);
         if (Objects.isNull(message)) {
             return;
         }
@@ -292,13 +280,8 @@ public class GroupMessageServiceImpl extends ServiceImpl<GroupMessageMapper, Gro
         // 记录已读消息位置
         redisTemplate.opsForHash().put(key, session.getUserId().toString(), message.getId());
         // 推送消息回执，刷新已读人数显示
-        wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(GroupMessage::getGroupId, groupId);
-        wrapper.gt(!Objects.isNull(maxReadedId), GroupMessage::getId, maxReadedId);
-        wrapper.le(!Objects.isNull(maxReadedId), GroupMessage::getId, message.getId());
-        wrapper.ne(GroupMessage::getStatus, MessageStatus.RECALL.code());
-        wrapper.eq(GroupMessage::getReceipt, true);
-        List<GroupMessage> receiptMessages = this.list(wrapper);
+        Long startId = Objects.isNull(maxReadedId) ? -1L : Long.parseLong(maxReadedId.toString());
+        List<GroupMessage> receiptMessages = mongoMessageService.findReceiptMessages(groupId, startId, message.getId(), MessageStatus.RECALL.code());
         if (CollectionUtil.isNotEmpty(receiptMessages)) {
             List<Long> userIds = groupMemberService.findUserIdsByGroupId(groupId);
             Map<Object, Object> maxIdMap = redisTemplate.opsForHash().entries(key);
@@ -307,7 +290,8 @@ public class GroupMessageServiceImpl extends ServiceImpl<GroupMessageMapper, Gro
                 // 如果所有人都已读，记录回执消息完成标记
                 if (readedCount >= userIds.size() - 1) {
                     receiptMessage.setReceiptOk(true);
-                    this.updateById(receiptMessage);
+                    // this.updateById(receiptMessage);
+                    mongoMessageService.updateGroupMessageReceiptOk(receiptMessage.getId(), true);
                 }
                 msgInfo = new GroupMessageVO();
                 msgInfo.setId(receiptMessage.getId());
@@ -329,7 +313,7 @@ public class GroupMessageServiceImpl extends ServiceImpl<GroupMessageMapper, Gro
     @Override
     public List<Long> findReadedUsers(Long groupId, Long messageId) {
         UserSession session = SessionContext.getSession();
-        GroupMessage message = this.getById(messageId);
+        GroupMessage message = mongoMessageService.findGroupMessageById(messageId).orElse(null);
         if (Objects.isNull(message)) {
             throw new GlobalException("消息不存在");
         }
@@ -358,11 +342,8 @@ public class GroupMessageServiceImpl extends ServiceImpl<GroupMessageMapper, Gro
             throw new GlobalException("您已不在群聊中");
         }
         // 查询聊天记录，只查询加入群聊时间之后的消息
-        QueryWrapper<GroupMessage> wrapper = new QueryWrapper<>();
-        wrapper.lambda().eq(GroupMessage::getGroupId, groupId).gt(GroupMessage::getSendTime, member.getCreatedTime())
-            .ne(GroupMessage::getStatus, MessageStatus.RECALL.code()).orderByDesc(GroupMessage::getId)
-            .last("limit " + stIdx + "," + size);
-        List<GroupMessage> messages = this.list(wrapper);
+        List<GroupMessage> messages = mongoMessageService.findGroupHistory(
+            groupId, member.getCreatedTime(), stIdx, size, MessageStatus.RECALL.code());
         List<GroupMessageVO> messageInfos =
             messages.stream().map(m -> BeanUtils.copyProperties(m, GroupMessageVO.class)).collect(Collectors.toList());
         log.info("拉取群聊记录，用户id:{},群聊id:{}，数量:{}", userId, groupId, messageInfos.size());
@@ -405,9 +386,7 @@ public class GroupMessageServiceImpl extends ServiceImpl<GroupMessageMapper, Gro
         if (CollectionUtil.isEmpty(ids)) {
             return new HashMap<>();
         }
-        LambdaQueryWrapper<GroupMessage> wrapper = Wrappers.lambdaQuery();
-        wrapper.in(GroupMessage::getId, ids);
-        List<GroupMessage> quoteMessages = this.list(wrapper);
+        List<GroupMessage> quoteMessages = mongoMessageService.findGroupMessagesByIds(ids);
         // 转为vo
         return quoteMessages.stream()
             .collect(Collectors.toMap(m -> m.getId(), m -> BeanUtils.copyProperties(m, QuoteMessageVO.class)));
