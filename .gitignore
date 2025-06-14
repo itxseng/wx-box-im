@@ -8,3 +8,4 @@
 /im-web/package-lock.json
 /im-uniapp/package-lock.json
 .env
+**/target/
