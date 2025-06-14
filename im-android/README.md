@@ -2,7 +2,7 @@
 
 这是一个参考 `im-uniapp` 逻辑实现的原生 Android 模块示例，使用 Kotlin 编写。
 
-该示例包含一个简单的 `LoginActivity`，通过 OkHttp 向后端 `/login` 接口发送请求，获取 `accessToken` 与 `refreshToken`。登录成功后会立即通过 OkHttp WebSocket 连接 `wss://www.boxim.online/im`，并定时发送心跳包。随后会进入 `MainActivity`，其中使用 `TabLayout` 和 `ViewPager2` 展示 "会话"、"好友"、"群" 三个列表。
+该示例包含一个简单的 `LoginActivity`，通过 OkHttp 向后端 `/login` 接口发送请求，获取 `accessToken` 与 `refreshToken`。登录成功后会立即通过 OkHttp WebSocket 连接 `wss://www.boxim.online/im`，并定时发送心跳包。接收到的消息会根据会话 ID 存入 `MessageStore`。随后会进入 `MainActivity`，其中使用 `TabLayout` 和 `ViewPager2` 展示 "会话"、"好友"、"群" 三个列表，会话页会显示最近一条消息。
 
 ## 目录结构
 

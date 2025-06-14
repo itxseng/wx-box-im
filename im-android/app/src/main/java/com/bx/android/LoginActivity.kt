@@ -6,6 +6,8 @@ import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import okhttp3.*
+import com.bx.android.model.MessageStore
+import com.bx.android.model.Conversation
 import android.content.Intent
 import android.content.SharedPreferences
 import org.json.JSONObject
@@ -61,6 +63,8 @@ class LoginActivity : AppCompatActivity() {
                         apply()
                     }
                     WebSocketManager.connect("wss://www.boxim.online/im", accessToken)
+                    // 初始化示例会话数据
+                    MessageStore.addConversation(Conversation(1, "示例会话"))
                     runOnUiThread {
                         Toast.makeText(this@LoginActivity, "登录成功", Toast.LENGTH_SHORT).show()
                         startActivity(Intent(this@LoginActivity, MainActivity::class.java))

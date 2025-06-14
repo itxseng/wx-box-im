@@ -3,6 +3,9 @@ package com.bx.android
 import android.os.Handler
 import android.os.Looper
 import okhttp3.*
+import com.bx.android.model.Message
+import com.bx.android.model.MessageStore
+import org.json.JSONObject
 
 object WebSocketManager {
     private val client = OkHttpClient()
@@ -26,6 +29,10 @@ object WebSocketManager {
                 handler.postDelayed(heartBeatTask, heartBeatInterval)
             }
 
+            override fun onMessage(ws: WebSocket, text: String) {
+                parseMessage(text)
+            }
+
             override fun onClosed(ws: WebSocket, code: Int, reason: String) {
                 handler.removeCallbacks(heartBeatTask)
             }
@@ -34,6 +41,21 @@ object WebSocketManager {
                 handler.removeCallbacks(heartBeatTask)
             }
         })
+    }
+
+    private fun parseMessage(text: String) {
+        try {
+            val json = JSONObject(text)
+            val data = json.optJSONObject("data") ?: return
+            val conversationId = data.optLong("conversationId")
+            val msgId = data.optLong("id")
+            val senderId = data.optLong("senderId")
+            val content = data.optString("content")
+            val timestamp = data.optLong("timestamp")
+            val msg = Message(msgId, conversationId, senderId, content, timestamp)
+            MessageStore.addMessage(msg)
+        } catch (_: Exception) {
+        }
     }
 
     fun send(text: String) {
