@@ -180,16 +180,18 @@ export default defineStore('chatStore', {
 				return;
 			}
 			// 插入新的数据
-			if (msgInfo.type == MESSAGE_TYPE.IMAGE) {
-				chat.lastContent = "[图片]";
-			} else if (msgInfo.type == MESSAGE_TYPE.VIDEO) {
-				chat.lastContent = "[视频]";
-			} else if (msgInfo.type == MESSAGE_TYPE.FILE) {
-				chat.lastContent = "[文件]";
-			} else if (msgInfo.type == MESSAGE_TYPE.AUDIO) {
-				chat.lastContent = "[语音]";
-			} else if (msgInfo.type == MESSAGE_TYPE.USER_CARD) {
-				chat.lastContent = "[个人名片] " + JSON.parse(msgInfo.content).nickName;
+                        if (msgInfo.type == MESSAGE_TYPE.IMAGE) {
+                                chat.lastContent = "[图片]";
+                        } else if (msgInfo.type == MESSAGE_TYPE.VIDEO) {
+                                chat.lastContent = "[视频]";
+                        } else if (msgInfo.type == MESSAGE_TYPE.FILE) {
+                                chat.lastContent = "[文件]";
+                        } else if (msgInfo.type == MESSAGE_TYPE.AUDIO) {
+                                chat.lastContent = "[语音]";
+                        } else if (msgInfo.type == MESSAGE_TYPE.FORWARD) {
+                                chat.lastContent = "[转发]";
+                        } else if (msgInfo.type == MESSAGE_TYPE.USER_CARD) {
+                                chat.lastContent = "[个人名片] " + JSON.parse(msgInfo.content).nickName;
 			} else if (msgInfo.type == MESSAGE_TYPE.GROUP_CARD) {
 				chat.lastContent = "[群名片] " + JSON.parse(msgInfo.content).groupName;
 			} else if (msgInfo.type == MESSAGE_TYPE.ACT_RT_VOICE) {
