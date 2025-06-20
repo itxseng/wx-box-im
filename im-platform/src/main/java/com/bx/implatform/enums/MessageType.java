@@ -25,6 +25,7 @@ public enum MessageType {
     VIDEO(4, "视频消息"),
     USER_CARD(5,"个人名片"),
     GROUP_CARD(6,"群名片"),
+    FORWARD(7,"转发消息"),
     RECALL(10, "撤回"),
     READED(11, "已读"),
     RECEIPT(12, "消息已读回执"),

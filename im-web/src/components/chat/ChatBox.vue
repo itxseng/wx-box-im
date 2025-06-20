@@ -618,20 +618,24 @@ export default {
 		onQuoteMessage(msgInfo) {
 			this.quoteMessage = msgInfo;
 		},
-		onForwardMessage(msgInfo) {
-			this.$refs.chatSel.open(chats => {
-				// 逐个会话发送消息
-				let idx = 0;
-				chats.forEach(chat => {
-					let message = {
-						content: msgInfo.content,
-						type: msgInfo.type
-					}
-					if (chat.type == 'GROUP') {
-						message.groupId = chat.targetId
-					} else {
-						message.recvId = chat.targetId;
-					}
+                onForwardMessage(msgInfo) {
+                        this.$refs.chatSel.open(chats => {
+                                // 逐个会话发送消息
+                                let idx = 0;
+                                chats.forEach(chat => {
+                                        let message = {
+                                                content: JSON.stringify({
+                                                        sendId: msgInfo.sendId,
+                                                        type: msgInfo.type,
+                                                        content: msgInfo.content
+                                                }),
+                                                type: this.$enums.MESSAGE_TYPE.FORWARD
+                                        }
+                                        if (chat.type == 'GROUP') {
+                                                message.groupId = chat.targetId
+                                        } else {
+                                                message.recvId = chat.targetId;
+                                        }
 					this.$http({
 						url: `/message/${chat.type.toLowerCase()}/send`,
 						method: 'post',

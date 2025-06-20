@@ -16,48 +16,53 @@
 					<el-tag v-if="isGroupOwner(msgInfo.sendId)" class="tag" size="mini" type="danger">群主</el-tag>
 					<el-tag v-if="isGroupManager(msgInfo.sendId)" class="tag" size="mini" type="primary">管理员</el-tag>
 				</div>
-				<div class="bottom" @contextmenu.prevent="showMessageMenu($event)">
-					<div ref="chatMsgBox">
-						<span class="message-text" v-if="msgInfo.type == $enums.MESSAGE_TYPE.TEXT"
-							v-html="htmlText"></span>
-						<div class="message-image" v-if="msgInfo.type == $enums.MESSAGE_TYPE.IMAGE">
-							<div v-loading="loading" element-loading-text="上传中.."
-								element-loading-background="rgba(0, 0, 0, 0.4)">
-								<img class="send-image" :src="contentData.thumbUrl" @click="showFullImageBox()"
-									loading="lazy" />
-							</div>
-							<span title="发送失败" v-show="loadFail" @click="onSendFail"
-								class="send-fail el-icon-warning"></span>
-						</div>
-						<div class="message-video" v-if="msgInfo.type == $enums.MESSAGE_TYPE.VIDEO">
-							<video class="send-video" controls preload="none" :poster="contentData.coverUrl"
-								:src="contentData.videoUrl" />
-							<span title="发送失败" v-show="loadFail" @click="onSendFail"
-								class="send-fail el-icon-warning"></span>
-						</div>
-						<div class="message-file" v-if="msgInfo.type == $enums.MESSAGE_TYPE.FILE">
-							<div class="file-box" v-loading="loading">
-								<div class="file-info">
-									<el-link class="file-name" :underline="true" target="_blank" type="primary"
-										:href="contentData.url" :download="contentData.name">{{ contentData.name
-										}}</el-link>
-									<div class="file-size">{{ fileSize }}</div>
-								</div>
-								<div class="file-icon">
-									<span type="primary" class="el-icon-document"></span>
-								</div>
-							</div>
-							<span title="发送失败" v-show="loadFail" @click="onSendFail"
-								class="send-fail el-icon-warning"></span>
-						</div>
-					</div>
-					<div class="message-voice" v-if="msgInfo.type == $enums.MESSAGE_TYPE.AUDIO" @click="onPlayVoice()">
-						<audio controls :src="contentData.url"></audio>
-					</div>
-					<chat-user-card v-if="msgInfo.type == $enums.MESSAGE_TYPE.USER_CARD"
-						:cardInfo="contentData"></chat-user-card>
-					<chat-group-card v-if="msgInfo.type == $enums.MESSAGE_TYPE.GROUP_CARD"
-						:cardInfo="contentData"></chat-group-card>
+                                <div class="bottom" @contextmenu.prevent="showMessageMenu($event)">
+                                        <div v-if="msgInfo.type == $enums.MESSAGE_TYPE.FORWARD" class="forward-tip">
+                                                消息转发自
+                                                <head-image :id="forwardData.sendId" :size="20"></head-image>
+                                                {{ forwardData.sendId }}
+                                        </div>
+                                        <div ref="chatMsgBox">
+                                                <span class="message-text" v-if="renderType == $enums.MESSAGE_TYPE.TEXT"
+                                                        v-html="htmlText"></span>
+                                                <div class="message-image" v-if="renderType == $enums.MESSAGE_TYPE.IMAGE">
+                                                        <div v-loading="loading" element-loading-text="上传中.."
+                                                                element-loading-background="rgba(0, 0, 0, 0.4)">
+                                                                <img class="send-image" :src="contentData.thumbUrl" @click="showFullImageBox()"
+                                                                        loading="lazy" />
+                                                        </div>
+                                                        <span title="发送失败" v-show="loadFail" @click="onSendFail"
+                                                                class="send-fail el-icon-warning"></span>
+                                                </div>
+                                                <div class="message-video" v-if="renderType == $enums.MESSAGE_TYPE.VIDEO">
+                                                        <video class="send-video" controls preload="none" :poster="contentData.coverUrl"
+                                                                :src="contentData.videoUrl" />
+                                                        <span title="发送失败" v-show="loadFail" @click="onSendFail"
+                                                                class="send-fail el-icon-warning"></span>
+                                                </div>
+                                                <div class="message-file" v-if="renderType == $enums.MESSAGE_TYPE.FILE">
+                                                        <div class="file-box" v-loading="loading">
+                                                                <div class="file-info">
+                                                                        <el-link class="file-name" :underline="true" target="_blank" type="primary"
+                                                                                :href="contentData.url" :download="contentData.name">{{ contentData.name
+                                                                                }}</el-link>
+                                                                        <div class="file-size">{{ fileSize }}</div>
+                                                                </div>
+                                                                <div class="file-icon">
+                                                                        <span type="primary" class="el-icon-document"></span>
+                                                                </div>
+                                                        </div>
+                                                        <span title="发送失败" v-show="loadFail" @click="onSendFail"
+                                                                class="send-fail el-icon-warning"></span>
+                                                </div>
+                                        </div>
+                                        <div class="message-voice" v-if="renderType == $enums.MESSAGE_TYPE.AUDIO" @click="onPlayVoice()">
+                                                <audio controls :src="contentData.url"></audio>
+                                        </div>
+                                        <chat-user-card v-if="renderType == $enums.MESSAGE_TYPE.USER_CARD"
+                                                :cardInfo="contentData"></chat-user-card>
+                                        <chat-group-card v-if="renderType == $enums.MESSAGE_TYPE.GROUP_CARD"
+                                                :cardInfo="contentData"></chat-group-card>
 					<div class="chat-action message-text" v-if="isAction">
 						<span v-if="msgInfo.type == $enums.MESSAGE_TYPE.ACT_RT_VOICE" title="重新呼叫"
 							@click="$emit('call')" class="iconfont icon-chat-voice"></span>
@@ -231,26 +236,42 @@ export default {
 		loadFail() {
 			return this.msgInfo.loadStatus && this.msgInfo.loadStatus === "fail";
 		},
-		contentData() {
-			return JSON.parse(this.msgInfo.content)
-		},
-		fileSize() {
-			let size = this.contentData.size;
-			if (size > 1024 * 1024) {
-				return Math.round(size / 1024 / 1024) + "M";
+                forwardData() {
+                        if (this.msgInfo.type == this.$enums.MESSAGE_TYPE.FORWARD) {
+                                try {
+                                        return JSON.parse(this.msgInfo.content)
+                                } catch (e) {
+                                        return {}
+                                }
+                        }
+                        return null
+                },
+                contentData() {
+                        if (this.forwardData) {
+                                return JSON.parse(this.forwardData.content)
+                        }
+                        return JSON.parse(this.msgInfo.content)
+                },
+                renderType() {
+                        return this.forwardData ? this.forwardData.type : this.msgInfo.type
+                },
+                fileSize() {
+                        let size = this.contentData.size;
+                        if (size > 1024 * 1024) {
+                                return Math.round(size / 1024 / 1024) + "M";
 			}
 			if (size > 1024) {
 				return Math.round(size / 1024) + "KB";
 			}
 			return size + "B";
 		},
-		isAction() {
-			return this.$msgType.isAction(this.msgInfo.type);
-		},
-		isNormal() {
-			const type = this.msgInfo.type;
-			return this.$msgType.isNormal(type) || this.$msgType.isAction(type)
-		},
+                isAction() {
+                        return this.$msgType.isAction(this.renderType);
+                },
+                isNormal() {
+                        const type = this.renderType;
+                        return this.$msgType.isNormal(type) || this.$msgType.isAction(type)
+                },
 		isOwner() {
 			let userId = this.userStore.userInfo.id;
 			return this.group && userId == this.group.ownerId
@@ -260,11 +281,12 @@ export default {
 			let m = this.groupMembers.find((m) => m.userId == userId);
 			return m && m.isManager;
 		},
-		htmlText() {
-			let color = this.msgInfo.selfSend ? 'white' : '';
-			let text = this.$url.replaceURLWithHTMLLinks(this.msgInfo.content, color)
-			return this.$emo.transform(text, 'emoji-normal')
-		}
+                htmlText() {
+                        let color = this.msgInfo.selfSend ? 'white' : '';
+                        let textContent = this.forwardData ? this.forwardData.content : this.msgInfo.content
+                        let text = this.$url.replaceURLWithHTMLLinks(textContent, color)
+                        return this.$emo.transform(text, 'emoji-normal')
+                }
 	}
 }
 </script>
@@ -461,11 +483,20 @@ export default {
 					}
 				}
 
-				.quote-message {
-					display: block;
-					margin-top: 3px;
-					cursor: pointer;
-				}
+                                .quote-message {
+                                        display: block;
+                                        margin-top: 3px;
+                                        cursor: pointer;
+                                }
+
+                                .forward-tip {
+                                        margin-bottom: 4px;
+                                        font-size: var(--im-font-size-small);
+                                        color: var(--im-text-color-light);
+                                        display: flex;
+                                        align-items: center;
+                                        gap: 4px;
+                                }
 
 				.message-status {
 					display: block;

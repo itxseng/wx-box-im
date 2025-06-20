@@ -9,26 +9,31 @@
 					<span>{{ showName }}</span>
 					<span>{{ $date.toTimeText(msgInfo.sendTime) }}</span>
 				</div>
-				<div class="bottom">
-					<div ref="chatMsgBox">
-						<span class="message-text" v-if="msgInfo.type == $enums.MESSAGE_TYPE.TEXT"
-							v-html="htmlText"></span>
-						<div class="message-image" v-if="msgInfo.type == $enums.MESSAGE_TYPE.IMAGE">
-							<div v-loading="loading" element-loading-text="上传中.."
-								element-loading-background="rgba(0, 0, 0, 0.4)">
-								<img class="send-image" :src="JSON.parse(msgInfo.content).thumbUrl"
+                                <div class="bottom">
+                                        <div v-if="msgInfo.type == $enums.MESSAGE_TYPE.FORWARD" class="forward-tip">
+                                                消息转发自
+                                                <head-image :id="forwardData.sendId" :size="20"></head-image>
+                                                {{ forwardData.sendId }}
+                                        </div>
+                                        <div ref="chatMsgBox">
+                                                <span class="message-text" v-if="renderType == $enums.MESSAGE_TYPE.TEXT"
+                                                        v-html="htmlText"></span>
+                                                <div class="message-image" v-if="renderType == $enums.MESSAGE_TYPE.IMAGE">
+                                                        <div v-loading="loading" element-loading-text="上传中.."
+                                                                element-loading-background="rgba(0, 0, 0, 0.4)">
+                                                                <img class="send-image" :src="JSON.parse(msgInfo.content).thumbUrl"
 									@click="showFullImageBox()" loading="lazy" />
 							</div>
 						</div>
-						<div class="message-video" v-if="msgInfo.type == $enums.MESSAGE_TYPE.VIDEO">
-							<video ref="videoPlayer" class="send-video" controls preload="none"
-								:poster="JSON.parse(msgInfo.content).coverUrl"
-								:src="JSON.parse(msgInfo.content).videoUrl" />
-						</div>
-						<div class="message-file" v-if="msgInfo.type == $enums.MESSAGE_TYPE.FILE">
-							<div class="chat-file-box" v-loading="loading">
-								<div class="chat-file-info">
-									<el-link class="chat-file-name" :underline="true" target="_blank" type="primary"
+                                                <div class="message-video" v-if="renderType == $enums.MESSAGE_TYPE.VIDEO">
+                                                        <video ref="videoPlayer" class="send-video" controls preload="none"
+                                                                :poster="JSON.parse(msgInfo.content).coverUrl"
+                                                                :src="JSON.parse(msgInfo.content).videoUrl" />
+                                                </div>
+                                                <div class="message-file" v-if="renderType == $enums.MESSAGE_TYPE.FILE">
+                                                        <div class="chat-file-box" v-loading="loading">
+                                                                <div class="chat-file-info">
+                                                                        <el-link class="chat-file-name" :underline="true" target="_blank" type="primary"
 										:href="contentData.url" :download="contentData.name">{{ contentData.name
 										}}</el-link>
 									<div class="chat-file-size">{{ fileSize }}</div>
@@ -39,13 +44,13 @@
 							</div>
 						</div>
 					</div>
-					<chat-user-card v-if="msgInfo.type == $enums.MESSAGE_TYPE.USER_CARD"
-						:cardInfo="contentData"></chat-user-card>
-					<chat-group-card v-if="msgInfo.type == $enums.MESSAGE_TYPE.GROUP_CARD"
-						:cardInfo="contentData"></chat-group-card>
-					<div class="message-voice" v-if="msgInfo.type == $enums.MESSAGE_TYPE.AUDIO" @click="onPlayVoice()">
-						<audio controls :src="JSON.parse(msgInfo.content).url"></audio>
-					</div>
+                                        <chat-user-card v-if="renderType == $enums.MESSAGE_TYPE.USER_CARD"
+                                                :cardInfo="contentData"></chat-user-card>
+                                        <chat-group-card v-if="renderType == $enums.MESSAGE_TYPE.GROUP_CARD"
+                                                :cardInfo="contentData"></chat-group-card>
+                                        <div class="message-voice" v-if="renderType == $enums.MESSAGE_TYPE.AUDIO" @click="onPlayVoice()">
+                                                <audio controls :src="JSON.parse(msgInfo.content).url"></audio>
+                                        </div>
 					<div class="quote-message" v-if="msgInfo.quoteMessage">
 						<chat-quote-message :msgInfo="msgInfo.quoteMessage"
 							:showName="quoteShowName"></chat-quote-message>
@@ -111,15 +116,31 @@ export default {
 			this.onPlayVoice = 'RUNNING';
 		}
 	},
-	computed: {
-		loading() {
-			return this.msgInfo.loadStatus && this.msgInfo.loadStatus === "loading";
-		},
-		contentData() {
-			return JSON.parse(this.msgInfo.content)
-		},
-		fileSize() {
-			let size = this.contentData.size;
+        computed: {
+                loading() {
+                        return this.msgInfo.loadStatus && this.msgInfo.loadStatus === "loading";
+                },
+                forwardData() {
+                        if (this.msgInfo.type == this.$enums.MESSAGE_TYPE.FORWARD) {
+                                try {
+                                        return JSON.parse(this.msgInfo.content)
+                                } catch (e) {
+                                        return {}
+                                }
+                        }
+                        return null
+                },
+                contentData() {
+                        if (this.forwardData) {
+                                return JSON.parse(this.forwardData.content)
+                        }
+                        return JSON.parse(this.msgInfo.content)
+                },
+                renderType() {
+                        return this.forwardData ? this.forwardData.type : this.msgInfo.type
+                },
+                fileSize() {
+                        let size = this.contentData.size;
 			if (size > 1024 * 1024) {
 				return Math.round(size / 1024 / 1024) + "M";
 			}
@@ -127,11 +148,12 @@ export default {
 				return Math.round(size / 1024) + "KB";
 			}
 			return size + "B";
-		},
-		htmlText() {
-			let text = this.$url.replaceURLWithHTMLLinks(this.msgInfo.content, '')
-			return this.$emo.transform(text, 'emoji-normal')
-		}
+                },
+                htmlText() {
+                        let textContent = this.forwardData ? this.forwardData.content : this.msgInfo.content
+                        let text = this.$url.replaceURLWithHTMLLinks(textContent, '')
+                        return this.$emo.transform(text, 'emoji-normal')
+                }
 	}
 }
 </script>
@@ -278,13 +300,22 @@ export default {
 					height: 45px;
 				}
 
-				.quote-message {
-					display: block;
-					margin-top: 3px;
-					cursor: pointer;
-				}
-			}
-		}
-	}
+                                .quote-message {
+                                        display: block;
+                                        margin-top: 3px;
+                                        cursor: pointer;
+                                }
+
+                                .forward-tip {
+                                        margin-bottom: 4px;
+                                        font-size: var(--im-font-size-small);
+                                        color: var(--im-text-color-light);
+                                        display: flex;
+                                        align-items: center;
+                                        gap: 4px;
+                                }
+                        }
+                }
+        }
 }
 </style>
